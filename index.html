@@ -798,6 +798,16 @@ function getFiltered() {
 // ── News fetch: 近24小時最熱門 30 則 ──
 const ALL_SOURCES = 'bloomberg.com,reuters.com,cnbc.com,seekingalpha.com,finance.yahoo.com';
 
+// 白名單：只允許這些來源的文章通過前端過濾
+const SOURCE_WHITELIST = new Set([
+  'bloomberg.com','reuters.com','cnbc.com',
+  'seekingalpha.com','finance.yahoo.com',
+  'bloomberg','reuters','cnbc','seeking alpha','yahoo finance'
+]);
+
+// 主題關鍵字：科技、經濟、地緣政治
+const TOPIC_KEYWORDS = /ai|artificial intelligence|semiconductor|chip|nvidia|apple|microsoft|google|amazon|meta|tesla|openai|cybersecurity|cloud|electric vehicle|ev|biotech|fed|federal reserve|interest rate|inflation|gdp|recession|earnings|stock market|nasdaq|s&p 500|bond|crypto|bitcoin|etf|tariff|trade war|sanction|geopolit|nato|ukraine|taiwan|china|russia|election|congress|white house|trump|xi jinping|policy|regulation/i;
+
 function classifyArticle(title, description) {
   const t = (title + ' ' + description).toLowerCase();
   if (/war|sanction|tariff|trade war|geopolit|nato|military|china|russia|ukraine|taiwan strait|conflict|diplomatic|election|congress|white house|biden|trump|xi jinping|government|policy|regulation|antitrust|sec |legislation/.test(t)) return 'geopolitics';
@@ -833,6 +843,15 @@ async function fetchMarketaux() {
       for (const a of data.data) {
         const cat = classifyArticle(a.title || '', a.description || '');
         const entityScore = a.entities?.reduce((max, e) => Math.max(max, e.popularity_score || 0), 0) || 0;
+        // 白名單過濾：來源必須在允許清單內
+        const srcLower = (a.source || '').toLowerCase();
+        const inWhitelist = [...SOURCE_WHITELIST].some(w => srcLower.includes(w));
+        if (!inWhitelist) continue;
+
+        // 主題過濾：必須與科技/經濟/地緣政治相關
+        const topicText = (a.title || '') + ' ' + (a.description || '');
+        if (!TOPIC_KEYWORDS.test(topicText) && cat === 'general') continue;
+
         articles.push({
           title: a.title || '',
           description: (a.description || '').slice(0, 300),
