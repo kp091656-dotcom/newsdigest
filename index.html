@@ -951,41 +951,47 @@ async function translateArticles() {
   if (!groqApiKey || !allArticles.length) return;
   setStatus('Groq 翻譯中…', 'loading');
 
-  // Batch size 10 — each batch ~300 tokens output, well within 4096 limit
-  const BATCH = 10;
+  const BATCH = 5; // smaller batch = less chance of truncation
   let successCount = 0;
 
   for (let i = 0; i < allArticles.length; i += BATCH) {
     const batch = allArticles.slice(i, i + BATCH);
-    const lines = batch.map((a, j) => `${j+1}. ${a.title} | ${(a.description||'').slice(0,100)}`).join('\n');
+    // Use simple numbered line format — easier for Groq to follow without JSON errors
+    const lines = batch.map((a, j) =>
+      `${j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,80).replace(/[|]/g,' ')}`
+    ).join('\n');
+
     try {
-      const prompt = `Translate the following ${batch.length} financial news items to Traditional Chinese (繁體中文). Each line has: index. title | description. Reply ONLY with valid JSON array, ${batch.length} objects: [{"t":"中文標題","d":"中文描述"},...]. No markdown, no extra text.
+      const prompt = `你是財經翻譯專員。將以下 ${batch.length} 則英文財經新聞翻譯成繁體中文。
+格式：每行 "編號. 標題 ||| 描述"
+請按相同格式輸出繁體中文，不要加任何說明或 markdown。
 
 ${lines}`;
+
       const raw = await callGemini(prompt);
-      const clean = raw.replace(/```json|```/g,'').trim();
-      // find JSON array in response
-      const match = clean.match(/\[[\s\S]*\]/);
-      if (!match) throw new Error('No JSON array in response');
-      const translated = JSON.parse(match[0]);
-      translated.forEach((t, j) => {
-        const art = allArticles[i + j];
-        if (art && t) {
-          if (t.t) art.title = t.t;
-          if (t.d) art.description = t.d;
-        }
+      const outputLines = raw.trim().split('\n').filter(l => l.match(/^\d+\./));
+
+      outputLines.forEach(line => {
+        const numMatch = line.match(/^(\d+)\.\s*/);
+        if (!numMatch) return;
+        const idx = parseInt(numMatch[1]) - 1;
+        const rest = line.replace(/^\d+\.\s*/, '');
+        const parts = rest.split('|||');
+        const art = allArticles[i + idx];
+        if (!art) return;
+        if (parts[0]?.trim()) art.title = parts[0].trim();
+        if (parts[1]?.trim()) art.description = parts[1].trim();
       });
+
       successCount += batch.length;
       setStatus(`Groq 翻譯中… ${successCount}/${allArticles.length}`, 'loading');
     } catch(e) {
       console.warn(`Translation batch ${i}-${i+BATCH} failed:`, e.message);
-      setStatus(`翻譯部分失敗: ${e.message}`, 'loading');
     }
-    // Small delay between batches to avoid rate limit
-    if (i + BATCH < allArticles.length) await new Promise(r => setTimeout(r, 800));
+    if (i + BATCH < allArticles.length) await new Promise(r => setTimeout(r, 600));
   }
 
-  setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則最熱門新聞`, 'ok');
+  setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則`, 'ok');
   renderFeed(getFiltered());
   renderTrending();
   generateBrief();
