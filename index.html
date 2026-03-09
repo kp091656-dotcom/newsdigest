@@ -839,12 +839,9 @@ async function fetchMarketaux() {
       for (const a of data.data) {
         const cat = classifyArticle(a.title || '', a.description || '');
         const entityScore = a.entities?.reduce((max, e) => Math.max(max, e.popularity_score || 0), 0) || 0;
-        // DEBUG: log source format to console
-        console.log('SOURCE:', JSON.stringify(a.source), '| URL:', (a.url||'').slice(0,50));
-
-        // 主題過濾：只過濾掉明顯無關的 general 類文章
+        // 主題過濾：只保留科技/經濟/地緣政治相關文章
         const topicText = (a.title || '') + ' ' + (a.description || '');
-        if (cat === 'general' && !TOPIC_KEYWORDS.test(topicText)) continue;
+        if (!TOPIC_KEYWORDS.test(topicText)) continue;
 
         articles.push({
           title: a.title || '',
