@@ -839,11 +839,8 @@ async function fetchMarketaux() {
       for (const a of data.data) {
         const cat = classifyArticle(a.title || '', a.description || '');
         const entityScore = a.entities?.reduce((max, e) => Math.max(max, e.popularity_score || 0), 0) || 0;
-        // 白名單過濾：來源或 URL 包含白名單關鍵字即通過
-        const srcLower = (a.source || '').toLowerCase();
-        const urlLower = (a.url || a.news_url || '').toLowerCase();
-        const inWhitelist = SOURCE_WHITELIST.some(w => srcLower.includes(w) || urlLower.includes(w));
-        if (!inWhitelist) continue;
+        // DEBUG: log source format to console
+        console.log('SOURCE:', JSON.stringify(a.source), '| URL:', (a.url||'').slice(0,50));
 
         // 主題過濾：只過濾掉明顯無關的 general 類文章
         const topicText = (a.title || '') + ' ' + (a.description || '');
