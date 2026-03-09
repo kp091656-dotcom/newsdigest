@@ -319,6 +319,11 @@
 
   .card-time { font-family: 'IBM Plex Mono', monospace; font-size: 0.65rem; color: var(--muted); }
   .card-source { font-size: 0.65rem; color: var(--muted); font-weight: 600; margin-left: auto; }
+  .pop-score { font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; color: var(--muted); background: #f5f3ee; border: 1px solid var(--border); border-radius: 3px; padding: 0.1rem 0.35rem; font-weight: 600; }
+  .pop-bar-wrap { display: flex; align-items: center; gap: 0.4rem; margin: 0.35rem 0 0.1rem; }
+  .pop-bar-track { flex: 1; height: 4px; background: #ede9e0; border-radius: 2px; overflow: hidden; }
+  .pop-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+  .pop-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.58rem; color: var(--muted); white-space: nowrap; }
 
   .card-title {
     font-family: 'Playfair Display', serif;
@@ -729,7 +734,13 @@ function createCard(article, idx) {
     <div class="card-meta">
       <span class="tag ${tag.cls}">${tag.label}</span>
       <span class="card-time">${timeAgo(article.publishedAt)}</span>
-      ${(article.popularityScore||0) >= 95 ? '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:0.58rem;background:#fef2f2;color:#c81a1a;border:1px solid #fca5a5;border-radius:3px;padding:0.1rem 0.4rem;font-weight:600;">⚡ 重大</span>' : (article.popularityScore||0) >= 80 ? '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:0.58rem;background:#fff1e6;color:#c8521a;border:1px solid #f5c09a;border-radius:3px;padding:0.1rem 0.4rem;font-weight:600;">🔥 熱門</span>' : ''}
+      ${(() => {
+        const s = article.popularityScore || 0;
+        if (s >= 95) return '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:0.58rem;background:#fef2f2;color:#c81a1a;border:1px solid #fca5a5;border-radius:3px;padding:0.1rem 0.4rem;font-weight:600;">⚡ 重大</span>';
+        if (s >= 80) return '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:0.58rem;background:#fff1e6;color:#c8521a;border:1px solid #f5c09a;border-radius:3px;padding:0.1rem 0.4rem;font-weight:600;">🔥 熱門</span>';
+        return '';
+      })()}
+      <span class="pop-score">${article.popularityScore > 0 ? article.popularityScore.toFixed(0) + ' 分' : '—'}</span>
       <span class="card-source">${article.source?.name || ''}</span>
     </div>
     <div class="card-title">
@@ -737,6 +748,17 @@ function createCard(article, idx) {
         ? `<a href="${article.url}" target="_blank" style="color:inherit;text-decoration:none;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='inherit'">${article.title || ''}</a>`
         : (article.title || '')}
     </div>
+    ${(() => {
+      const s = article.popularityScore || 0;
+      if (s === 0) return '';
+      const pct = Math.min(s, 100);
+      const color = s >= 95 ? '#ef4444' : s >= 80 ? '#f97316' : s >= 60 ? '#eab308' : '#94a3b8';
+      const label = s >= 95 ? '極熱門' : s >= 80 ? '熱門' : s >= 60 ? '有熱度' : '一般';
+      return `<div class="pop-bar-wrap">
+        <div class="pop-bar-track"><div class="pop-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <span class="pop-label">${label} ${pct.toFixed(0)}%</span>
+      </div>`;
+    })()}
     ${article.description ? `<div class="card-desc">${article.description}</div>` : ''}
     <div class="ai-analysis-area">
       <div class="ai-analysis-label">◆ Groq AI 分析</div>
