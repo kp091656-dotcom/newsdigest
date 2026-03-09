@@ -863,9 +863,7 @@ async function fetchMarketaux() {
       for (const a of data.data) {
         const cat = classifyArticle(a.title || '', a.description || '');
         const entityScore = a.entities?.reduce((max, e) => Math.max(max, e.popularity_score || 0), 0) || 0;
-        // 主題過濾：只保留科技/經濟/地緣政治相關文章
-        const topicText = (a.title || '') + ' ' + (a.description || '');
-        if (!TOPIC_KEYWORDS.test(topicText)) continue;
+        // 不做主題過濾，讓 Marketaux 的 sort_by=entity_popularity_score 自然篩選
 
         articles.push({
           title: a.title || '',
