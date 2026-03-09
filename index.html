@@ -673,7 +673,7 @@ const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 let groqApiKey = '';
 let allArticles = [];
 let displayedCount = 0;
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 30;
 let currentLang = 'zh';
 let currentCat = 'general';
 
@@ -912,7 +912,16 @@ async function fetchMarketaux() {
     const now = new Date();
     const lastEl = document.getElementById('lastRefreshTime');
     if (lastEl) lastEl.textContent = '上次更新 ' + now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    if (groqApiKey) translateArticles();
+    // Try translation - reload key from localStorage in case it wasn't set yet
+    const savedGroq = groqApiKey || localStorage.getItem('nd_groq_key') || '';
+    if (savedGroq) {
+      groqApiKey = savedGroq;
+      document.getElementById('groqKey').value = savedGroq;
+      setGroqStatus('✓ 已啟用（已記住）', 'ok');
+      translateArticles();
+    } else {
+      setStatus(`✓ 已載入 ${articles.length} 則最熱門新聞（請設定 Groq Key 以啟用翻譯）`, 'ok');
+    }
 
   } catch(e) {
     setStatus(`✗ ${e.message}`, 'err');
@@ -976,7 +985,7 @@ ${lines}`;
     if (i + BATCH < allArticles.length) await new Promise(r => setTimeout(r, 800));
   }
 
-  setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則`, 'ok');
+  setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則最熱門新聞`, 'ok');
   renderFeed(getFiltered());
   renderTrending();
   generateBrief();
