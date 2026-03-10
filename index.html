@@ -680,6 +680,48 @@
         <button class="brief-refresh" onclick="generateBrief('tw')">↻ 重新生成</button>
       </div>
     </div>
+
+    <!-- Fear & Greed Index -->
+    <div class="sidebar-section" id="fgiSection">
+      <div class="sidebar-header">😱 Fear &amp; Greed Index <span style="font-size:0.6rem;opacity:0.7;">· CNN</span></div>
+      <div style="padding:1rem 1.1rem;">
+        <div id="fgiLoading" style="font-size:0.78rem;color:var(--muted);">載入中…</div>
+        <div id="fgiContent" style="display:none;">
+          <div style="text-align:center;margin-bottom:0.8rem;">
+            <svg viewBox="0 0 200 110" width="100%" style="max-width:220px;">
+              <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#ede9e0" stroke-width="16" stroke-linecap="round"/>
+              <path id="fgiArc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#94a3b8" stroke-width="16" stroke-linecap="round" stroke-dasharray="0 251"/>
+              <line id="fgiNeedle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="2.5" stroke-linecap="round" transform="rotate(0, 100, 100)"/>
+              <circle cx="100" cy="100" r="5" fill="#333"/>
+              <text x="14" y="118" font-size="7" fill="#ef4444" font-family="monospace">極度恐懼</text>
+              <text x="186" y="118" font-size="7" fill="#22c55e" font-family="monospace" text-anchor="end">極度貪婪</text>
+            </svg>
+            <div id="fgiScore" style="font-size:2.2rem;font-weight:800;font-family:'Playfair Display',serif;line-height:1;">—</div>
+            <div id="fgiLabel" style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.05em;margin-top:0.2rem;">—</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;">
+            <div style="background:#f5f3ee;border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.2rem;">昨日</div>
+              <div id="fgiYest">—</div>
+            </div>
+            <div style="background:#f5f3ee;border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.2rem;">上週</div>
+              <div id="fgiWeek">—</div>
+            </div>
+            <div style="background:#f5f3ee;border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.2rem;">上月</div>
+              <div id="fgiMonth">—</div>
+            </div>
+            <div style="background:#f5f3ee;border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.2rem;">去年</div>
+              <div id="fgiYear">—</div>
+            </div>
+          </div>
+          <div id="fgiTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);text-align:center;margin-top:0.6rem;"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="sidebar-section">
       <div class="sidebar-header">最新快訊 <span>TOP 5</span></div>
       <div id="trending"></div>
@@ -1031,6 +1073,80 @@ ${lines}`;
   generateBrief();
 }
 
+// ── Fear & Greed Index (Alternative.me API - CORS friendly) ──
+function fgiRatingZH(val) {
+  if (val >= 75) return { label: '極度貪婪', color: '#16a34a' };
+  if (val >= 55) return { label: '貪婪', color: '#22c55e' };
+  if (val >= 45) return { label: '中性', color: '#eab308' };
+  if (val >= 25) return { label: '恐懼', color: '#f97316' };
+  return { label: '極度恐懼', color: '#ef4444' };
+}
+
+async function loadFearGreed() {
+  try {
+    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json', { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    const d = data.data?.[0];
+    if (!d) throw new Error('no data');
+
+    const score = parseInt(d.value);
+    const { label, color } = fgiRatingZH(score);
+
+    // Update score and label
+    document.getElementById('fgiScore').textContent = score;
+    document.getElementById('fgiScore').style.color = color;
+    document.getElementById('fgiLabel').textContent = label;
+    document.getElementById('fgiLabel').style.color = color;
+
+    // Animate gauge arc (score 0-100 → stroke-dashoffset on a 251px arc)
+    const arcLen = 251;
+    const filled = (score / 100) * arcLen;
+    const arc = document.getElementById('fgiArc');
+    arc.setAttribute('stroke-dasharray', `${filled} ${arcLen - filled}`);
+    arc.setAttribute('stroke', color);
+
+    // Rotate needle: 0 = left (-90deg), 100 = right (+90deg)
+    const angle = -90 + (score / 100) * 180;
+    document.getElementById('fgiNeedle').setAttribute('transform', `rotate(${angle}, 100, 100)`);
+
+    // Fetch historical for comparison (limit=32 gives ~1 month)
+    const res2 = await fetch('https://api.alternative.me/fng/?limit=32&format=json', { signal: AbortSignal.timeout(8000) });
+    const data2 = await res2.json();
+    const hist = data2.data || [];
+
+    const getVal = (idx) => {
+      const v = hist[idx];
+      if (!v) return '—';
+      const n = parseInt(v.value);
+      const r = fgiRatingZH(n);
+      return `<span style="color:${r.color};font-weight:800;">${n}</span><div style="font-size:0.6rem;color:${r.color};">${r.label}</div>`;
+    };
+
+    document.getElementById('fgiYest').innerHTML = getVal(1);
+    document.getElementById('fgiWeek').innerHTML = getVal(7);
+    document.getElementById('fgiMonth').innerHTML = getVal(30);
+
+    // Year requires separate call
+    const res3 = await fetch('https://api.alternative.me/fng/?limit=366&format=json', { signal: AbortSignal.timeout(8000) });
+    const data3 = await res3.json();
+    const hist3 = data3.data || [];
+    const yearVal = hist3[365];
+    if (yearVal) {
+      const n = parseInt(yearVal.value);
+      const r = fgiRatingZH(n);
+      document.getElementById('fgiYear').innerHTML = `<span style="color:${r.color};font-weight:800;">${n}</span><div style="font-size:0.6rem;color:${r.color};">${r.label}</div>`;
+    }
+
+    document.getElementById('fgiTs').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit'});
+    document.getElementById('fgiLoading').style.display = 'none';
+    document.getElementById('fgiContent').style.display = 'block';
+
+  } catch(e) {
+    document.getElementById('fgiLoading').textContent = '載入失敗，請稍後再試';
+    console.warn('FGI error:', e.message);
+  }
+}
+
 // ── Market Summary ──
 async function generateMarketSummary() {
   if (!groqApiKey || !allArticles.length) return;
@@ -1302,6 +1418,7 @@ function loadSavedKeys() {
 // ── Init ──
 renderTrending();
 loadSavedKeys();
+loadFearGreed();
 setTimeout(() => {
   allArticles = mockArticles;
   renderFeed(getFiltered());
