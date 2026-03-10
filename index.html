@@ -1083,67 +1083,81 @@ function fgiRatingZH(val) {
 }
 
 async function loadFearGreed() {
-  try {
-    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json', { signal: AbortSignal.timeout(8000) });
-    const data = await res.json();
-    const d = data.data?.[0];
-    if (!d) throw new Error('no data');
+  // Use allorigins.win CORS proxy to fetch CNN's real Fear & Greed data
+  const CNN_URL = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
+  const PROXY = 'https://api.allorigins.win/get?url=' + encodeURIComponent(CNN_URL);
 
-    const score = parseInt(d.value);
+  try {
+    const res = await fetch(PROXY, { signal: AbortSignal.timeout(10000) });
+    const wrapper = await res.json();
+    const data = JSON.parse(wrapper.contents);
+
+    const now = data.fear_and_greed;
+    if (!now) throw new Error('no data');
+
+    const score = Math.round(now.score);
     const { label, color } = fgiRatingZH(score);
 
-    // Update score and label
+    // Score + label
     document.getElementById('fgiScore').textContent = score;
     document.getElementById('fgiScore').style.color = color;
     document.getElementById('fgiLabel').textContent = label;
     document.getElementById('fgiLabel').style.color = color;
 
-    // Animate gauge arc (score 0-100 → stroke-dashoffset on a 251px arc)
+    // Gauge arc
     const arcLen = 251;
     const filled = (score / 100) * arcLen;
     const arc = document.getElementById('fgiArc');
     arc.setAttribute('stroke-dasharray', `${filled} ${arcLen - filled}`);
     arc.setAttribute('stroke', color);
 
-    // Rotate needle: 0 = left (-90deg), 100 = right (+90deg)
+    // Needle: -90deg = 0, +90deg = 100
     const angle = -90 + (score / 100) * 180;
     document.getElementById('fgiNeedle').setAttribute('transform', `rotate(${angle}, 100, 100)`);
 
-    // Fetch historical for comparison (limit=32 gives ~1 month)
-    const res2 = await fetch('https://api.alternative.me/fng/?limit=32&format=json', { signal: AbortSignal.timeout(8000) });
-    const data2 = await res2.json();
-    const hist = data2.data || [];
-
-    const getVal = (idx) => {
-      const v = hist[idx];
-      if (!v) return '—';
-      const n = parseInt(v.value);
+    // Historical comparison from fear_and_greed_historical
+    const hist = data.fear_and_greed_historical?.data || [];
+    // hist is sorted oldest→newest, so last = today, second-to-last = yesterday
+    const getHistVal = (daysAgo) => {
+      const idx = hist.length - 1 - daysAgo;
+      if (idx < 0) return '—';
+      const n = Math.round(hist[idx].y);
       const r = fgiRatingZH(n);
       return `<span style="color:${r.color};font-weight:800;">${n}</span><div style="font-size:0.6rem;color:${r.color};">${r.label}</div>`;
     };
 
-    document.getElementById('fgiYest').innerHTML = getVal(1);
-    document.getElementById('fgiWeek').innerHTML = getVal(7);
-    document.getElementById('fgiMonth').innerHTML = getVal(30);
+    document.getElementById('fgiYest').innerHTML = getHistVal(1);
+    document.getElementById('fgiWeek').innerHTML = getHistVal(7);
+    document.getElementById('fgiMonth').innerHTML = getHistVal(30);
+    document.getElementById('fgiYear').innerHTML = getHistVal(365);
 
-    // Year requires separate call
-    const res3 = await fetch('https://api.alternative.me/fng/?limit=366&format=json', { signal: AbortSignal.timeout(8000) });
-    const data3 = await res3.json();
-    const hist3 = data3.data || [];
-    const yearVal = hist3[365];
-    if (yearVal) {
-      const n = parseInt(yearVal.value);
-      const r = fgiRatingZH(n);
-      document.getElementById('fgiYear').innerHTML = `<span style="color:${r.color};font-weight:800;">${n}</span><div style="font-size:0.6rem;color:${r.color};">${r.label}</div>`;
-    }
-
-    document.getElementById('fgiTs').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit'});
+    const ts = now.timestamp ? new Date(now.timestamp * 1000).toLocaleString('zh-TW', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    document.getElementById('fgiTs').textContent = '資料來源：CNN · ' + ts;
     document.getElementById('fgiLoading').style.display = 'none';
     document.getElementById('fgiContent').style.display = 'block';
 
   } catch(e) {
-    document.getElementById('fgiLoading').textContent = '載入失敗，請稍後再試';
-    console.warn('FGI error:', e.message);
+    // Fallback to Alternative.me if CNN proxy fails
+    console.warn('CNN FGI failed, trying Alternative.me:', e.message);
+    try {
+      const r2 = await fetch('https://api.alternative.me/fng/?limit=1', { signal: AbortSignal.timeout(8000) });
+      const d2 = await r2.json();
+      const score = parseInt(d2.data?.[0]?.value || 0);
+      const { label, color } = fgiRatingZH(score);
+      document.getElementById('fgiScore').textContent = score;
+      document.getElementById('fgiScore').style.color = color;
+      document.getElementById('fgiLabel').textContent = label + ' (加密市場)';
+      document.getElementById('fgiLabel').style.color = color;
+      const arcLen = 251;
+      document.getElementById('fgiArc').setAttribute('stroke-dasharray', `${(score/100)*arcLen} ${arcLen-(score/100)*arcLen}`);
+      document.getElementById('fgiArc').setAttribute('stroke', color);
+      document.getElementById('fgiNeedle').setAttribute('transform', `rotate(${-90+(score/100)*180}, 100, 100)`);
+      document.getElementById('fgiTs').textContent = '資料來源：Alternative.me（加密市場版）';
+      document.getElementById('fgiLoading').style.display = 'none';
+      document.getElementById('fgiContent').style.display = 'block';
+    } catch(e2) {
+      document.getElementById('fgiLoading').textContent = '載入失敗，請稍後再試';
+    }
   }
 }
 
