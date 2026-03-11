@@ -472,7 +472,7 @@
   .load-more:hover { border-color: var(--accent); color: var(--accent); background: #fff8f5; }
 
   /* Sidebar */
-  .sidebar { display: flex; flex-direction: column; gap: 1.5rem; position: sticky; top: 110px; }
+  .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
 
   .sidebar-section {
     background: var(--card-bg);
@@ -683,7 +683,7 @@
 
     <!-- Fear & Greed Index -->
     <div class="sidebar-section" id="fgiSection">
-      <div class="sidebar-header">😱 Fear &amp; Greed Index <span style="font-size:0.6rem;opacity:0.7;">· CNN</span></div>
+      <div class="sidebar-header">📈 Fear &amp; Greed Index <span style="font-size:0.6rem;opacity:0.7;">· CNN 股市</span></div>
       <div style="padding:1rem 1.1rem;">
         <div id="fgiLoading" style="font-size:0.78rem;color:var(--muted);">載入中…</div>
         <div id="fgiContent" style="display:none;">
@@ -699,25 +699,74 @@
             <div id="fgiScore" style="font-size:2.2rem;font-weight:800;font-family:'Playfair Display',serif;line-height:1;">—</div>
             <div id="fgiLabel" style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.05em;margin-top:0.2rem;">—</div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.5rem;">
-            <div style="background:#f5f3ee;border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.2rem;">昨日</div>
-              <div id="fgiYest">—</div>
+          <div style="margin-top:0.6rem;display:flex;flex-direction:column;gap:0.25rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fef2f2;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ef4444;font-weight:700;">極度恐懼</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ef4444;">0 – 24</span>
             </div>
-            <div style="background:#f5f3ee;border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.2rem;">上週</div>
-              <div id="fgiWeek">—</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fff7ed;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#f97316;font-weight:700;">恐懼</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#f97316;">25 – 44</span>
             </div>
-            <div style="background:#f5f3ee;border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.2rem;">上月</div>
-              <div id="fgiMonth">—</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fefce8;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ca8a04;font-weight:700;">中性</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ca8a04;">45 – 54</span>
             </div>
-            <div style="background:#f5f3ee;border-radius:6px;padding:0.45rem 0.6rem;text-align:center;">
-              <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;color:var(--muted);margin-bottom:0.2rem;">去年</div>
-              <div id="fgiYear">—</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#f0fdf4;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#16a34a;font-weight:700;">貪婪</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#16a34a;">55 – 74</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#dcfce7;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#15803d;font-weight:700;">極度貪婪</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#15803d;">75 – 100</span>
             </div>
           </div>
           <div id="fgiTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);text-align:center;margin-top:0.6rem;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Crypto Fear & Greed -->
+    <div class="sidebar-section" id="fgiCryptoSection">
+      <div class="sidebar-header">₿ Fear &amp; Greed Index <span style="font-size:0.6rem;opacity:0.7;">· 加密貨幣</span></div>
+      <div style="padding:1rem 1.1rem;">
+        <div id="fgiCryptoLoading" style="font-size:0.78rem;color:var(--muted);">載入中…</div>
+        <div id="fgiCryptoContent" style="display:none;">
+          <div style="text-align:center;margin-bottom:0.8rem;">
+            <svg viewBox="0 0 200 110" width="100%" style="max-width:220px;">
+              <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#ede9e0" stroke-width="16" stroke-linecap="round"/>
+              <path id="fgiCryptoArc" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#94a3b8" stroke-width="16" stroke-linecap="round" stroke-dasharray="0 251"/>
+              <line id="fgiCryptoNeedle" x1="100" y1="100" x2="100" y2="28" stroke="#333" stroke-width="2.5" stroke-linecap="round" transform="rotate(0, 100, 100)"/>
+              <circle cx="100" cy="100" r="5" fill="#333"/>
+              <text x="14" y="118" font-size="7" fill="#ef4444" font-family="monospace">極度恐懼</text>
+              <text x="186" y="118" font-size="7" fill="#22c55e" font-family="monospace" text-anchor="end">極度貪婪</text>
+            </svg>
+            <div id="fgiCryptoScore" style="font-size:2.2rem;font-weight:800;font-family:'Playfair Display',serif;line-height:1;">—</div>
+            <div id="fgiCryptoLabel" style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.05em;margin-top:0.2rem;">—</div>
+          </div>
+          <div style="margin-top:0.6rem;display:flex;flex-direction:column;gap:0.25rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fef2f2;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ef4444;font-weight:700;">極度恐懼</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ef4444;">0 – 24</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fff7ed;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#f97316;font-weight:700;">恐懼</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#f97316;">25 – 44</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#fefce8;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ca8a04;font-weight:700;">中性</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#ca8a04;">45 – 54</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#f0fdf4;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#16a34a;font-weight:700;">貪婪</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#16a34a;">55 – 74</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.25rem 0.5rem;border-radius:4px;background:#dcfce7;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#15803d;font-weight:700;">極度貪婪</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:0.63rem;color:#15803d;">75 – 100</span>
+            </div>
+          </div>
+          <div id="fgiCryptoTs" style="font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--muted);text-align:center;margin-top:0.6rem;"></div>
         </div>
       </div>
     </div>
@@ -1131,22 +1180,6 @@ async function loadFearGreed() {
     const angle = -90 + (score / 100) * 180;
     document.getElementById('fgiNeedle').setAttribute('transform', `rotate(${angle}, 100, 100)`);
 
-    // Historical comparison from fear_and_greed_historical
-    const hist = data.fear_and_greed_historical?.data || [];
-    // hist is sorted oldest→newest, so last = today, second-to-last = yesterday
-    const getHistVal = (daysAgo) => {
-      const idx = hist.length - 1 - daysAgo;
-      if (idx < 0) return '—';
-      const n = Math.round(hist[idx].y);
-      const r = fgiRatingZH(n);
-      return `<span style="color:${r.color};font-weight:800;">${n}</span><div style="font-size:0.6rem;color:${r.color};">${r.label}</div>`;
-    };
-
-    document.getElementById('fgiYest').innerHTML = getHistVal(1);
-    document.getElementById('fgiWeek').innerHTML = getHistVal(7);
-    document.getElementById('fgiMonth').innerHTML = getHistVal(30);
-    document.getElementById('fgiYear').innerHTML = getHistVal(365);
-
     const ts = now.timestamp ? new Date(now.timestamp * 1000).toLocaleString('zh-TW', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
     document.getElementById('fgiTs').textContent = '資料來源：CNN · ' + ts;
     document.getElementById('fgiLoading').style.display = 'none';
@@ -1177,6 +1210,37 @@ async function loadFearGreed() {
     } catch(e2) {
       document.getElementById('fgiLoading').textContent = '載入失敗，請稍後再試';
     }
+  }
+}
+
+// ── Crypto Fear & Greed (Alternative.me) ──
+async function loadCryptoFearGreed() {
+  try {
+    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json', { signal: AbortSignal.timeout(8000) });
+    const data = await res.json();
+    const hist = data.data || [];
+    if (!hist.length) throw new Error('no data');
+
+    const score = parseInt(hist[0].value);
+    const { label, color } = fgiRatingZH(score);
+
+    document.getElementById('fgiCryptoScore').textContent = score;
+    document.getElementById('fgiCryptoScore').style.color = color;
+    document.getElementById('fgiCryptoLabel').textContent = label;
+    document.getElementById('fgiCryptoLabel').style.color = color;
+
+    const arcLen = 251;
+    const filled = (score / 100) * arcLen;
+    document.getElementById('fgiCryptoArc').setAttribute('stroke-dasharray', `${filled} ${arcLen - filled}`);
+    document.getElementById('fgiCryptoArc').setAttribute('stroke', color);
+    document.getElementById('fgiCryptoNeedle').setAttribute('transform', `rotate(${-90 + (score/100)*180}, 100, 100)`);
+
+    document.getElementById('fgiCryptoTs').textContent = '資料來源：Alternative.me · ' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('fgiCryptoLoading').style.display = 'none';
+    document.getElementById('fgiCryptoContent').style.display = 'block';
+  } catch(e) {
+    document.getElementById('fgiCryptoLoading').textContent = '載入失敗';
+    console.warn('Crypto FGI error:', e.message);
   }
 }
 
@@ -1452,6 +1516,7 @@ function loadSavedKeys() {
 renderTrending();
 loadSavedKeys();
 loadFearGreed();
+loadCryptoFearGreed();
 setTimeout(() => {
   allArticles = mockArticles;
   renderFeed(getFiltered());
