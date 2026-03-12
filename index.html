@@ -601,11 +601,11 @@
 <!-- API Config -->
 <div class="api-config-bar">
   <div class="api-row">
-    <label>◆ THENEWSAPI TOKEN</label>
-    <input class="api-input" id="marketauxKey" type="password" placeholder="TheNewsAPI Token（thenewsapi.com 免費申請）">
+    <label>◆ MARKETAUX KEY</label>
+    <input class="api-input" id="marketauxKey" type="password" placeholder="Marketaux API Key（marketaux.com 免費申請，不需信用卡）">
     <button class="api-fetch-btn" id="fetchBtn" onclick="fetchMarketaux()">載入財經新聞</button>
     <span class="api-status" id="apiStatus">示範模式</span>
-    <span class="api-hint">免費申請：<a href="https://www.marketaux.com/register" target="_blank">marketaux.com</a> · 每日 200 次</span>
+    <span class="api-hint">免費申請：<a href="https://www.marketaux.com/register" target="_blank">marketaux.com</a> · 每日 100 次</span>
   </div>
   <div class="api-row">
     <label>◆ GROQ KEY</label>
@@ -937,18 +937,6 @@ function getFiltered() {
   return filtered;
 }
 
-// ── News fetch: TheNewsAPI ──
-const THENEWS_KEY = '';  // filled by user input
-let theNewsApiKey = '';
-
-function classifyArticle(title, description) {
-  const t = (title + ' ' + description).toLowerCase();
-  if (/war|sanction|tariff|trade war|geopolit|nato|military|china|russia|ukraine|taiwan strait|conflict|diplomatic|election|congress|white house|trump|xi jinping|government|policy|regulation|antitrust|legislation/.test(t)) return 'geopolitics';
-  if (/ai|artificial intelligence|chatgpt|openai|nvidia|semiconductor|chip|llm|machine learning|apple|microsoft|google|alphabet|meta|amazon|tesla|software|hardware|cloud|cyber|quantum|robot|autonomous|electric vehicle|ev|5g|biotech/.test(t)) return 'tech';
-  if (/fed|federal reserve|interest rate|inflation|gdp|recession|economy|treasury|earnings|revenue|profit|stock|market|nasdaq|s&p|dow|bond|yield|currency|dollar|euro|yen|oil|gold|crypto|bitcoin|etf|fund|invest|bank|finance|quarter|fiscal/.test(t)) return 'economy';
-  return 'general';
-}
-
 function setStatus(msg, type) {
   const el = document.getElementById('apiStatus');
   if (!el) return;
@@ -956,86 +944,70 @@ function setStatus(msg, type) {
   el.className = 'api-status' + (type ? ' ' + type : '');
 }
 
+// ── News fetch: Marketaux (17 pages × 3 = 51 articles) ──
 async function fetchMarketaux() {
   const key = document.getElementById('marketauxKey').value.trim();
-  if (!key) { setStatus('請輸入 TheNewsAPI Token', 'err'); return; }
+  if (!key) { setStatus('請輸入 Marketaux API Key', 'err'); return; }
 
   const btn = document.getElementById('fetchBtn');
   btn.disabled = true;
   btn.textContent = '載入中…';
-  setStatus('連線中…', 'loading');
-  document.getElementById('newsFeed').innerHTML = '<div class="feed-state"><div class="spinner"></div><p>正在從 Bloomberg · Reuters · CNBC · Seeking Alpha · Yahoo Finance 載入新聞…</p></div>';
+  setStatus('連線 Marketaux…', 'loading');
+  document.getElementById('newsFeed').innerHTML = '<div class="feed-state"><div class="spinner"></div><p>正在從 Marketaux 載入財經新聞…</p></div>';
 
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const domains = 'bloomberg.com,reuters.com,cnbc.com,seekingalpha.com,finance.yahoo.com';
-  const categories = 'business,tech,politics';
-
-  // TheNewsAPI: 3 pages x 10 = 30, then top headlines x 2 pages = 20, total ~50
-  const allReqs = [1,2,3].map(p =>
-    fetch(`https://api.thenewsapi.com/v1/news/all?api_token=${key}&domains=${domains}&language=en&limit=10&page=${p}&published_after=${cutoff}&sort=published_at`,
-      ).then(r => r.json()).catch(() => null)
-  );
-  const topReqs = [1,2].map(p =>
-    fetch(`https://api.thenewsapi.com/v1/news/top?api_token=${key}&language=en&limit=10&page=${p}&categories=${categories}`,
-      ).then(r => r.json()).catch(() => null)
-  );
+  const published_after = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
 
   try {
-    const [allResults, topResults] = await Promise.all([
-      Promise.all(allReqs),
-      Promise.all(topReqs),
-    ]);
+    const pages = Array.from({length: 17}, (_, i) => i + 1);
+    const requests = pages.map(p =>
+      fetch(`https://api.marketaux.com/v1/news/all?language=en&limit=3&page=${p}&sort_by=entity_popularity_score&published_after=${published_after}&api_token=${key}`)
+        .then(r => r.json()).catch(() => null)
+    );
+    const results = await Promise.all(requests);
 
     let articles = [];
-    const parseResults = (results) => {
-      for (const data of results) {
-        if (!data || data.error || !data.data?.length) continue;
-        for (const a of data.data) {
-          if (!a.description || a.description.trim().length < 30) continue;
+    for (const data of results) {
+      if (!data || data.error || !data.data?.length) continue;
+      for (const a of data.data) {
+        if (!a.description || a.description.trim().length < 30) continue;
 
-          // India blacklist
-          const indiaCheck = (a.source||'') + ' ' + (a.url||'') + ' ' + (a.title||'') + ' ' + (a.description||'');
-          if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata/i.test(indiaCheck)) continue;
+        // India blacklist
+        const indiaCheck = (a.source||'') + ' ' + (a.url||'') + ' ' + (a.title||'') + ' ' + (a.description||'');
+        if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata/i.test(indiaCheck)) continue;
 
-          // 必須與美股或台股相關
-          const stockCheck = (a.title||'') + ' ' + (a.description||'');
-          const isUSorTW = /nasdaq|s&p|dow jones|nyse|wall street|federal reserve|\bfed\b|us stock|us market|american stock|silicon valley|tsm|tsmc|taiwan semi|taiwan stock|taiex|台積電|taiwan market|amd|nvidia|apple|microsoft|google|amazon|meta|tesla|openai|intel|qualcomm|broadcom|arm\b|asml|us economy|us gdp|us inflation|us jobs|us earnings|us trade|us tariff|us china|white house|congress|sec\b|dow|s&p 500|russell|etf|nasdaq 100/i.test(stockCheck);
-          if (!isUSorTW) continue;
+        // Must relate to US or TW stocks
+        const stockCheck = (a.title||'') + ' ' + (a.description||'');
+        const isUSorTW = /nasdaq|s&p|dow jones|nyse|wall street|federal reserve|fed|us stock|us market|silicon valley|tsm|tsmc|taiwan semi|taiwan stock|taiex|台積電|amd|nvidia|apple|microsoft|google|amazon|meta|tesla|openai|intel|qualcomm|broadcom|arm|asml|us economy|us gdp|us inflation|us jobs|us earnings|us trade|us tariff|us china|white house|congress|sec|dow|s&p 500|russell|etf|nasdaq 100/i.test(stockCheck);
+        if (!isUSorTW) continue;
 
-          const cat = classifyArticle(a.title || '', a.description || '');
-          articles.push({
-            title: a.title || '',
-            description: (a.description || '').slice(0, 300),
-            url: a.url || '#',
-            publishedAt: a.published_at || new Date().toISOString(),
-            source: a.source || '',
-            category: cat,
-            popularityScore: 0,
-          });
-        }
+        const entityScore = a.entities?.reduce((max, e) => Math.max(max, e.popularity_score || 0), 0) || 0;
+        articles.push({
+          title: a.title || '',
+          description: (a.description || '').slice(0, 300),
+          url: a.url || '#',
+          publishedAt: a.published_at || new Date().toISOString(),
+          source: a.source || '',
+          category: classifyArticle(a.title || '', a.description || ''),
+          popularityScore: entityScore,
+        });
       }
-    };
+    }
 
-    parseResults(allResults);
-    parseResults(topResults);
-
-    // Deduplicate by title
+    // Deduplicate
     const seen = new Set();
-    articles = articles.filter(a => {
-      if (!a.title || seen.has(a.title)) return false;
-      seen.add(a.title); return true;
-    });
+    articles = articles.filter(a => { if (!a.title || seen.has(a.title)) return false; seen.add(a.title); return true; });
 
-    // Sort by time, take top 50
-    articles.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    // Rank-based score if all zero
+    const allZero = articles.every(a => a.popularityScore === 0);
+    if (allZero) {
+      console.log('Using rank-based popularity scores');
+      articles.forEach((a, i) => { a.popularityScore = Math.round(100 - (i / Math.max(articles.length - 1, 1)) * 90); });
+    }
+
+    articles.sort((a, b) => b.popularityScore - a.popularityScore);
     articles = articles.slice(0, 50);
 
-    // Assign rank-based popularity score
-    articles.forEach((a, i) => {
-      a.popularityScore = Math.round(100 - (i / articles.length) * 90);
-    });
-
-    if (!articles.length) throw new Error('未取得任何新聞，請確認 API Token 正確');
+    if (!articles.length) throw new Error('未取得任何新聞，請確認 API Key 正確');
 
     allArticles = articles;
     localStorage.setItem('nd_marketaux_key', key);
@@ -1071,125 +1043,6 @@ async function fetchMarketaux() {
   }
 }
 
-
-// ── Fear & Greed Index (Alternative.me API - CORS friendly) ──
-function fgiRatingZH(val) {
-  if (val >= 75) return { label: '極度貪婪', color: '#16a34a' };
-  if (val >= 55) return { label: '貪婪', color: '#22c55e' };
-  if (val >= 45) return { label: '中性', color: '#eab308' };
-  if (val >= 25) return { label: '恐懼', color: '#f97316' };
-  return { label: '極度恐懼', color: '#ef4444' };
-}
-
-async function loadFearGreed() {
-  // Use allorigins.win CORS proxy to fetch CNN's real Fear & Greed data
-  const CNN_URL = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
-  const PROXIES = [
-    'https://corsproxy.io/?url=' + encodeURIComponent(CNN_URL),
-    'https://api.allorigins.win/get?url=' + encodeURIComponent(CNN_URL),
-    'https://thingproxy.freeboard.io/fetch/' + CNN_URL,
-  ];
-
-  try {
-    let data = null;
-    for (const proxy of PROXIES) {
-      try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 8000);
-        const res = await fetch(proxy, { signal: ctrl.signal });
-        clearTimeout(timer);
-        const raw = await res.text();
-        // allorigins wraps in {contents:...}, others return raw JSON
-        const parsed = JSON.parse(raw);
-        data = parsed.contents ? JSON.parse(parsed.contents) : parsed;
-        if (data?.fear_and_greed) break;
-      } catch(pe) { console.warn('Proxy failed:', pe.message); continue; }
-    }
-    if (!data?.fear_and_greed) throw new Error('all proxies failed');
-
-    const now = data.fear_and_greed;
-    if (!now) throw new Error('no data');
-
-    const score = Math.round(now.score);
-    const { label, color } = fgiRatingZH(score);
-
-    // Score + label
-    document.getElementById('fgiScore').textContent = score;
-    document.getElementById('fgiScore').style.color = color;
-    document.getElementById('fgiLabel').textContent = label;
-    document.getElementById('fgiLabel').style.color = color;
-
-    // Gauge arc
-    const arcLen = 251;
-    const filled = (score / 100) * arcLen;
-    const arc = document.getElementById('fgiArc');
-    arc.setAttribute('stroke-dasharray', `${filled} ${arcLen - filled}`);
-    arc.setAttribute('stroke', color);
-
-    // Needle: -90deg = 0, +90deg = 100
-    const angle = -90 + (score / 100) * 180;
-    document.getElementById('fgiNeedle').setAttribute('transform', `rotate(${angle}, 100, 100)`);
-
-    const ts = now.timestamp ? new Date(now.timestamp * 1000).toLocaleString('zh-TW', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-    document.getElementById('fgiTs').textContent = '資料來源：CNN · ' + ts;
-    document.getElementById('fgiLoading').style.display = 'none';
-    document.getElementById('fgiContent').style.display = 'block';
-
-  } catch(e) {
-    // Fallback to Alternative.me if CNN proxy fails
-    console.warn('CNN FGI failed, trying Alternative.me:', e.message);
-    try {
-      const r2 = await fetch('https://api.alternative.me/fng/?limit=1');
-      const d2 = await r2.json();
-      const score = parseInt(d2.data?.[0]?.value || 0);
-      const { label, color } = fgiRatingZH(score);
-      document.getElementById('fgiScore').textContent = score;
-      document.getElementById('fgiScore').style.color = color;
-      document.getElementById('fgiLabel').textContent = label + ' (加密市場)';
-      document.getElementById('fgiLabel').style.color = color;
-      const arcLen = 251;
-      document.getElementById('fgiArc').setAttribute('stroke-dasharray', `${(score/100)*arcLen} ${arcLen-(score/100)*arcLen}`);
-      document.getElementById('fgiArc').setAttribute('stroke', color);
-      document.getElementById('fgiNeedle').setAttribute('transform', `rotate(${-90+(score/100)*180}, 100, 100)`);
-      document.getElementById('fgiTs').textContent = '資料來源：Alternative.me（加密市場版）';
-      document.getElementById('fgiLoading').style.display = 'none';
-      document.getElementById('fgiContent').style.display = 'block';
-    } catch(e2) {
-      document.getElementById('fgiLoading').textContent = '載入失敗，請稍後再試';
-    }
-  }
-}
-
-// ── Crypto Fear & Greed (Alternative.me) ──
-async function loadCryptoFearGreed() {
-  try {
-    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json');
-    const data = await res.json();
-    const hist = data.data || [];
-    if (!hist.length) throw new Error('no data');
-
-    const score = parseInt(hist[0].value);
-    const { label, color } = fgiRatingZH(score);
-
-    document.getElementById('fgiCryptoScore').textContent = score;
-    document.getElementById('fgiCryptoScore').style.color = color;
-    document.getElementById('fgiCryptoLabel').textContent = label;
-    document.getElementById('fgiCryptoLabel').style.color = color;
-
-    const arcLen = 251;
-    const filled = (score / 100) * arcLen;
-    document.getElementById('fgiCryptoArc').setAttribute('stroke-dasharray', `${filled} ${arcLen - filled}`);
-    document.getElementById('fgiCryptoArc').setAttribute('stroke', color);
-    document.getElementById('fgiCryptoNeedle').setAttribute('transform', `rotate(${-90 + (score/100)*180}, 100, 100)`);
-
-    document.getElementById('fgiCryptoTs').textContent = '資料來源：Alternative.me · ' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
-    document.getElementById('fgiCryptoLoading').style.display = 'none';
-    document.getElementById('fgiCryptoContent').style.display = 'block';
-  } catch(e) {
-    document.getElementById('fgiCryptoLoading').textContent = '載入失敗';
-    console.warn('Crypto FGI error:', e.message);
-  }
-}
 
 // ── Translate articles to Traditional Chinese via Groq ──
 async function translateArticles() {
