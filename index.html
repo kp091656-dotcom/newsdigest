@@ -601,11 +601,11 @@
 <!-- API Config -->
 <div class="api-config-bar">
   <div class="api-row">
-    <label>◆ MARKETAUX KEY</label>
+    <label>◆ THENEWSAPI TOKEN</label>
     <input class="api-input" id="marketauxKey" type="password" placeholder="Marketaux API Key（marketaux.com 免費申請，不需信用卡）">
     <button class="api-fetch-btn" id="fetchBtn" onclick="fetchMarketaux()">載入財經新聞</button>
     <span class="api-status" id="apiStatus">示範模式</span>
-    <span class="api-hint">免費申請：<a href="https://www.marketaux.com/register" target="_blank">marketaux.com</a> · 每日 100 次</span>
+    <span class="api-hint">免費申請：<a href="https://www.marketaux.com/register" target="_blank">marketaux.com</a> · 每日 200 次</span>
   </div>
   <div class="api-row">
     <label>◆ GROQ KEY</label>
@@ -937,118 +937,116 @@ function getFiltered() {
   return filtered;
 }
 
-// ── News fetch: 近24小時最熱門 30 則 ──
-const ALL_SOURCES = 'bloomberg.com,reuters.com,cnbc.com,seekingalpha.com,finance.yahoo.com';
-
-// 白名單關鍵字：來源只要包含其中一個字串即通過
-const SOURCE_WHITELIST = ['bloomberg','reuters','cnbc','seekingalpha','seeking alpha','yahoo'];
-
-// 主題關鍵字：科技、經濟、地緣政治
-const TOPIC_KEYWORDS = /ai|artificial intelligence|semiconductor|chip|nvidia|apple|microsoft|google|amazon|meta|tesla|openai|cybersecurity|cloud|electric vehicle|ev|biotech|fed|federal reserve|interest rate|inflation|gdp|recession|earnings|stock market|nasdaq|s&p|bond|crypto|bitcoin|etf|tariff|trade war|sanction|geopolit|nato|ukraine|taiwan|china|russia|election|congress|white house|trump|xi jinping|policy|regulation/i;
+// ── News fetch: TheNewsAPI ──
+const THENEWS_KEY = '';  // filled by user input
+let theNewsApiKey = '';
 
 function classifyArticle(title, description) {
   const t = (title + ' ' + description).toLowerCase();
-  if (/war|sanction|tariff|trade war|geopolit|nato|military|china|russia|ukraine|taiwan strait|conflict|diplomatic|election|congress|white house|biden|trump|xi jinping|government|policy|regulation|antitrust|sec |legislation/.test(t)) return 'geopolitics';
-  if (/ai|artificial intelligence|chatgpt|openai|nvidia|semiconductor|chip|llm|machine learning|apple|microsoft|google|alphabet|meta|amazon|tesla|software|hardware|startup|cloud|cyber|quantum|robot|autonomous|electric vehicle|ev|5g|biotech|genome/.test(t)) return 'tech';
+  if (/war|sanction|tariff|trade war|geopolit|nato|military|china|russia|ukraine|taiwan strait|conflict|diplomatic|election|congress|white house|trump|xi jinping|government|policy|regulation|antitrust|legislation/.test(t)) return 'geopolitics';
+  if (/ai|artificial intelligence|chatgpt|openai|nvidia|semiconductor|chip|llm|machine learning|apple|microsoft|google|alphabet|meta|amazon|tesla|software|hardware|cloud|cyber|quantum|robot|autonomous|electric vehicle|ev|5g|biotech/.test(t)) return 'tech';
   if (/fed|federal reserve|interest rate|inflation|gdp|recession|economy|treasury|earnings|revenue|profit|stock|market|nasdaq|s&p|dow|bond|yield|currency|dollar|euro|yen|oil|gold|crypto|bitcoin|etf|fund|invest|bank|finance|quarter|fiscal/.test(t)) return 'economy';
   return 'general';
 }
 
 async function fetchMarketaux() {
   const key = document.getElementById('marketauxKey').value.trim();
-  if (!key) { setStatus('請輸入 Marketaux API Key', 'err'); return; }
+  if (!key) { setStatus('請輸入 TheNewsAPI Token', 'err'); return; }
 
   const btn = document.getElementById('fetchBtn');
   btn.disabled = true;
   btn.textContent = '載入中…';
   setStatus('連線中…', 'loading');
-  document.getElementById('newsFeed').innerHTML = '<div class="feed-state"><div class="spinner"></div><p>正在載入近 24 小時最熱門新聞…</p></div>';
+  document.getElementById('newsFeed').innerHTML = '<div class="feed-state"><div class="spinner"></div><p>正在從 Bloomberg · Reuters · CNBC · Seeking Alpha · Yahoo Finance 載入新聞…</p></div>';
 
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
+  const domains = 'bloomberg.com,reuters.com,cnbc.com,seekingalpha.com,finance.yahoo.com';
+  const categories = 'business,tech,politics';
 
-  // 10頁並發，每頁3則，共30則，依熱門度排序
-  // 17頁並發，每頁3則，共51則，過濾後約50則
-  const reqs = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17].map(p =>
-    fetch(`https://api.marketaux.com/v1/news/all?language=en&limit=3&page=${p}&published_after=${cutoff}&sort_by=entity_popularity_score&api_token=${key}`,
+  // TheNewsAPI: 3 pages x 10 = 30, then top headlines x 2 pages = 20, total ~50
+  const allReqs = [1,2,3].map(p =>
+    fetch(`https://api.thenewsapi.com/v1/news/all?api_token=${key}&domains=${domains}&language=en&limit=10&page=${p}&published_after=${cutoff}&sort=published_at`,
+      { signal: AbortSignal.timeout(12000) }).then(r => r.json()).catch(() => null)
+  );
+  const topReqs = [1,2].map(p =>
+    fetch(`https://api.thenewsapi.com/v1/news/top?api_token=${key}&language=en&limit=10&page=${p}&categories=${categories}`,
       { signal: AbortSignal.timeout(12000) }).then(r => r.json()).catch(() => null)
   );
 
   try {
-    const results = await Promise.all(reqs);
+    const [allResults, topResults] = await Promise.all([
+      Promise.all(allReqs),
+      Promise.all(topReqs),
+    ]);
 
     let articles = [];
-    for (const data of results) {
-      if (!data || data.error || !data.data?.length) continue;
-      for (const a of data.data) {
-        const cat = classifyArticle(a.title || '', a.description || '');
-        const entityScore = a.entities?.reduce((max, e) => Math.max(max, e.popularity_score || 0), 0) || 0;
-        // 過濾：描述太短略過
-        if (!a.description || a.description.trim().length < 30) continue;
+    const parseResults = (results) => {
+      for (const data of results) {
+        if (!data || data.error || !data.data?.length) continue;
+        for (const a of data.data) {
+          if (!a.description || a.description.trim().length < 30) continue;
 
-                // 黑名單：排除印度相關新聞
-        const indiaCheck = (a.source||'') + ' ' + (a.url||'') + ' ' + (a.title||'') + ' ' + (a.description||'');
-        if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata/i.test(indiaCheck)) continue;
+          // India blacklist
+          const indiaCheck = (a.source||'') + ' ' + (a.url||'') + ' ' + (a.title||'') + ' ' + (a.description||'');
+          if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata/i.test(indiaCheck)) continue;
 
-        // 主題過濾：排除明顯非財經新聞
-        const topicCheck = (a.title + ' ' + (a.description||'')).toLowerCase();
-        const isBiz = /stock|market|trade|economy|finance|invest|bank|rate|inflation|gdp|earnings|crypto|bitcoin|tech|ai|chip|energy|oil|gold|bond|fund|fed|nasdaq|s&p|trump|tariff|sanction|china|taiwan|ukraine|russia|war|election|policy|microsoft|apple|google|amazon|nvidia|tesla|meta/.test(topicCheck);
-        if (!isBiz) continue;
-
-        articles.push({
-          title: a.title || '',
-          description: (a.description || '').slice(0, 300),
-          url: a.url || a.news_url || '#',
-          publishedAt: a.published_at || new Date().toISOString(),
-          source: a.source || '',
-          category: cat,
-          popularityScore: entityScore,
-        });
+          const cat = classifyArticle(a.title || '', a.description || '');
+          articles.push({
+            title: a.title || '',
+            description: (a.description || '').slice(0, 300),
+            url: a.url || '#',
+            publishedAt: a.published_at || new Date().toISOString(),
+            source: a.source || '',
+            category: cat,
+            popularityScore: 0,
+          });
+        }
       }
-    }
+    };
 
-    // 去重 + 排序（熱門分數優先，同分則按時間）
+    parseResults(allResults);
+    parseResults(topResults);
+
+    // Deduplicate by title
     const seen = new Set();
     articles = articles.filter(a => {
       if (!a.title || seen.has(a.title)) return false;
       seen.add(a.title); return true;
     });
-    articles.sort((a, b) => (b.popularityScore - a.popularityScore) || (new Date(b.publishedAt) - new Date(a.publishedAt)));
 
-    // 只取前30則
+    // Sort by time, take top 50
+    articles.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
     articles = articles.slice(0, 50);
 
-    // If all popularityScore are 0, assign rank-based score (1st = 100, last = 10)
-    const allZero = articles.every(a => (a.popularityScore || 0) === 0);
-    if (allZero) {
-      articles.forEach((a, i) => {
-        a.popularityScore = Math.round(100 - (i / articles.length) * 90);
-      });
-      console.log('Using rank-based popularity scores');
-    }
+    // Assign rank-based popularity score
+    articles.forEach((a, i) => {
+      a.popularityScore = Math.round(100 - (i / articles.length) * 90);
+    });
 
-    if (!articles.length) throw new Error('未取得任何新聞，請確認 API Key 正確');
+    if (!articles.length) throw new Error('未取得任何新聞，請確認 API Token 正確');
 
     allArticles = articles;
     localStorage.setItem('nd_marketaux_key', key);
-    setStatus(`✓ 已載入 ${articles.length} 則最熱門新聞`, 'ok');
+
+    const techCnt = articles.filter(a => a.category === 'tech').length;
+    const econCnt = articles.filter(a => a.category === 'economy').length;
+    const geoCnt  = articles.filter(a => a.category === 'geopolitics').length;
+    setStatus(`✓ 科技 ${techCnt} · 經濟 ${econCnt} · 地緣政治 ${geoCnt}`, 'ok');
 
     renderFeed(getFiltered());
     renderTrending();
     generateBrief();
-    if (groqApiKey) generateMarketSummary();
 
     const now = new Date();
     const lastEl = document.getElementById('lastRefreshTime');
     if (lastEl) lastEl.textContent = '上次更新 ' + now.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    // Try translation - reload key from localStorage in case it wasn't set yet
+
     const savedGroq = groqApiKey || localStorage.getItem('nd_groq_key') || '';
     if (savedGroq) {
       groqApiKey = savedGroq;
       document.getElementById('groqKey').value = savedGroq;
       setGroqStatus('✓ 已啟用（已記住）', 'ok');
       translateArticles();
-    } else {
-      setStatus(`✓ 已載入 ${articles.length} 則最熱門新聞（請設定 Groq Key 以啟用翻譯）`, 'ok');
     }
 
   } catch(e) {
@@ -1060,71 +1058,7 @@ async function fetchMarketaux() {
     btn.textContent = '載入財經新聞';
   }
 }
-// alias for auto-refresh timer
-function fetchGNews(silent) { return fetchMarketaux(); }
 
-function setStatus(msg, type) {
-  const el = document.getElementById('apiStatus');
-  el.textContent = msg;
-  el.className = 'api-status' + (type ? ` ${type}` : '');
-}
-
-
-
-
-
-
-// ── Translate articles titles+desc to Traditional Chinese via Groq ──
-async function translateArticles() {
-  if (!groqApiKey || !allArticles.length) return;
-  setStatus('Groq 翻譯中…', 'loading');
-
-  const BATCH = 5; // smaller batch = less chance of truncation
-  let successCount = 0;
-
-  for (let i = 0; i < allArticles.length; i += BATCH) {
-    const batch = allArticles.slice(i, i + BATCH);
-    // Use simple numbered line format — easier for Groq to follow without JSON errors
-    const lines = batch.map((a, j) =>
-      `${j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,80).replace(/[|]/g,' ')}`
-    ).join('\n');
-
-    try {
-      const prompt = `你是財經翻譯專員。將以下 ${batch.length} 則英文財經新聞翻譯成繁體中文。
-格式：每行 "編號. 標題 ||| 描述"
-請按相同格式輸出繁體中文，不要加任何說明或 markdown。
-
-${lines}`;
-
-      const raw = await callGemini(prompt);
-      const outputLines = raw.trim().split('\n').filter(l => l.match(/^\d+\./));
-
-      outputLines.forEach(line => {
-        const numMatch = line.match(/^(\d+)\.\s*/);
-        if (!numMatch) return;
-        const idx = parseInt(numMatch[1]) - 1;
-        const rest = line.replace(/^\d+\.\s*/, '');
-        const parts = rest.split('|||');
-        const art = allArticles[i + idx];
-        if (!art) return;
-        if (parts[0]?.trim()) art.title = parts[0].trim();
-        if (parts[1]?.trim()) art.description = parts[1].trim();
-      });
-
-      successCount += batch.length;
-      setStatus(`Groq 翻譯中… ${successCount}/${allArticles.length}`, 'loading');
-    } catch(e) {
-      console.warn(`Translation batch ${i}-${i+BATCH} failed:`, e.message);
-    }
-    if (i + BATCH < allArticles.length) await new Promise(r => setTimeout(r, 600));
-  }
-
-  setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則`, 'ok');
-  generateMarketSummary();
-  renderFeed(getFiltered());
-  renderTrending();
-  generateBrief();
-}
 
 // ── Fear & Greed Index (Alternative.me API - CORS friendly) ──
 function fgiRatingZH(val) {
