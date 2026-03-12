@@ -602,7 +602,7 @@
 <div class="api-config-bar">
   <div class="api-row">
     <label>◆ THENEWSAPI TOKEN</label>
-    <input class="api-input" id="marketauxKey" type="password" placeholder="Marketaux API Key（marketaux.com 免費申請，不需信用卡）">
+    <input class="api-input" id="marketauxKey" type="password" placeholder="TheNewsAPI Token（thenewsapi.com 免費申請）">
     <button class="api-fetch-btn" id="fetchBtn" onclick="fetchMarketaux()">載入財經新聞</button>
     <span class="api-status" id="apiStatus">示範模式</span>
     <span class="api-hint">免費申請：<a href="https://www.marketaux.com/register" target="_blank">marketaux.com</a> · 每日 200 次</span>
@@ -949,6 +949,13 @@ function classifyArticle(title, description) {
   return 'general';
 }
 
+function setStatus(msg, type) {
+  const el = document.getElementById('apiStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'api-status' + (type ? ' ' + type : '');
+}
+
 async function fetchMarketaux() {
   const key = document.getElementById('marketauxKey').value.trim();
   if (!key) { setStatus('請輸入 TheNewsAPI Token', 'err'); return; }
@@ -966,11 +973,11 @@ async function fetchMarketaux() {
   // TheNewsAPI: 3 pages x 10 = 30, then top headlines x 2 pages = 20, total ~50
   const allReqs = [1,2,3].map(p =>
     fetch(`https://api.thenewsapi.com/v1/news/all?api_token=${key}&domains=${domains}&language=en&limit=10&page=${p}&published_after=${cutoff}&sort=published_at`,
-      { signal: AbortSignal.timeout(12000) }).then(r => r.json()).catch(() => null)
+      ).then(r => r.json()).catch(() => null)
   );
   const topReqs = [1,2].map(p =>
     fetch(`https://api.thenewsapi.com/v1/news/top?api_token=${key}&language=en&limit=10&page=${p}&categories=${categories}`,
-      { signal: AbortSignal.timeout(12000) }).then(r => r.json()).catch(() => null)
+      ).then(r => r.json()).catch(() => null)
   );
 
   try {
@@ -1078,7 +1085,7 @@ async function loadFearGreed() {
   // Use allorigins.win CORS proxy to fetch CNN's real Fear & Greed data
   const CNN_URL = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
   const PROXIES = [
-    'https://corsproxy.io/?' + encodeURIComponent(CNN_URL),
+    'https://corsproxy.io/?url=' + encodeURIComponent(CNN_URL),
     'https://api.allorigins.win/get?url=' + encodeURIComponent(CNN_URL),
     'https://thingproxy.freeboard.io/fetch/' + CNN_URL,
   ];
@@ -1132,10 +1139,7 @@ async function loadFearGreed() {
     // Fallback to Alternative.me if CNN proxy fails
     console.warn('CNN FGI failed, trying Alternative.me:', e.message);
     try {
-      const ctrl2 = new AbortController();
-      const timer2 = setTimeout(() => ctrl2.abort(), 8000);
-      const r2 = await fetch('https://api.alternative.me/fng/?limit=1', { signal: ctrl2.signal });
-      clearTimeout(timer2);
+      const r2 = await fetch('https://api.alternative.me/fng/?limit=1');
       const d2 = await r2.json();
       const score = parseInt(d2.data?.[0]?.value || 0);
       const { label, color } = fgiRatingZH(score);
@@ -1159,7 +1163,7 @@ async function loadFearGreed() {
 // ── Crypto Fear & Greed (Alternative.me) ──
 async function loadCryptoFearGreed() {
   try {
-    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json', { signal: AbortSignal.timeout(8000) });
+    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json');
     const data = await res.json();
     const hist = data.data || [];
     if (!hist.length) throw new Error('no data');
