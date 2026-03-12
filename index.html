@@ -985,6 +985,10 @@ async function fetchMarketaux() {
         // 過濾：描述太短略過
         if (!a.description || a.description.trim().length < 30) continue;
 
+                // 黑名單：排除印度相關新聞
+        const indiaCheck = (a.source||'') + ' ' + (a.url||'') + ' ' + (a.title||'') + ' ' + (a.description||'');
+        if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata/i.test(indiaCheck)) continue;
+
         // 主題過濾：排除明顯非財經新聞
         const topicCheck = (a.title + ' ' + (a.description||'')).toLowerCase();
         const isBiz = /stock|market|trade|economy|finance|invest|bank|rate|inflation|gdp|earnings|crypto|bitcoin|tech|ai|chip|energy|oil|gold|bond|fund|fed|nasdaq|s&p|trump|tariff|sanction|china|taiwan|ukraine|russia|war|election|policy|microsoft|apple|google|amazon|nvidia|tesla|meta/.test(topicCheck);
