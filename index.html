@@ -966,7 +966,7 @@ async function fetchMarketaux() {
   setStatus('連線中…', 'loading');
   document.getElementById('newsFeed').innerHTML = '<div class="feed-state"><div class="spinner"></div><p>正在從 Bloomberg · Reuters · CNBC · Seeking Alpha · Yahoo Finance 載入新聞…</p></div>';
 
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const domains = 'bloomberg.com,reuters.com,cnbc.com,seekingalpha.com,finance.yahoo.com';
   const categories = 'business,tech,politics';
 
@@ -1189,6 +1189,49 @@ async function loadCryptoFearGreed() {
     document.getElementById('fgiCryptoLoading').textContent = '載入失敗';
     console.warn('Crypto FGI error:', e.message);
   }
+}
+
+// ── Translate articles to Traditional Chinese via Groq ──
+async function translateArticles() {
+  if (!groqApiKey || !allArticles.length) return;
+  setStatus('Groq 翻譯中…', 'loading');
+
+  const BATCH = 5;
+  let successCount = 0;
+
+  for (let i = 0; i < allArticles.length; i += BATCH) {
+    const batch = allArticles.slice(i, i + BATCH);
+    const lines = batch.map((a, j) =>
+      `${j+1}. ${a.title.replace(/[|]/g,' ')} ||| ${(a.description||'').slice(0,80).replace(/[|]/g,' ')}`
+    ).join('\n');
+
+    try {
+      const prompt = `你是財經翻譯專員。將以下 ${batch.length} 則英文財經新聞翻譯成繁體中文。格式：每行 "編號. 標題 ||| 描述"，請按相同格式輸出繁體中文，不要加任何說明或 markdown。\n\n${lines}`;
+      const raw = await callGemini(prompt);
+      const outputLines = raw.trim().split('\n').filter(l => l.match(/^\d+\./));
+      outputLines.forEach(line => {
+        const numMatch = line.match(/^(\d+)\.\s*/);
+        if (!numMatch) return;
+        const idx = parseInt(numMatch[1]) - 1;
+        const rest = line.replace(/^\d+\.\s*/, '');
+        const parts = rest.split('|||');
+        const art = allArticles[i + idx];
+        if (!art) return;
+        if (parts[0]?.trim()) art.title = parts[0].trim();
+        if (parts[1]?.trim()) art.description = parts[1].trim();
+      });
+      successCount += batch.length;
+      setStatus(`Groq 翻譯中… ${successCount}/${allArticles.length}`, 'loading');
+    } catch(e) {
+      console.warn(`Translation batch ${i} failed:`, e.message);
+    }
+    if (i + BATCH < allArticles.length) await new Promise(r => setTimeout(r, 600));
+  }
+
+  setStatus(`✓ 翻譯完成，共 ${allArticles.length} 則`, 'ok');
+  renderFeed(getFiltered());
+  renderTrending();
+  generateBrief();
 }
 
 // ── Market Summary ──
