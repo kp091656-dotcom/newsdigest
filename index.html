@@ -990,6 +990,11 @@ async function fetchMarketaux() {
           const indiaCheck = (a.source||'') + ' ' + (a.url||'') + ' ' + (a.title||'') + ' ' + (a.description||'');
           if (/indiatimes|hindustantimes|livemint|moneycontrol|economictimes|ndtv|thehindubusinessline|zeebiz|sensex|nifty|sebi|rupee|mumbai|bengaluru|hyderabad|chennai|kolkata/i.test(indiaCheck)) continue;
 
+          // 必須與美股或台股相關
+          const stockCheck = (a.title||'') + ' ' + (a.description||'');
+          const isUSorTW = /nasdaq|s&p|dow jones|nyse|wall street|federal reserve|\bfed\b|us stock|us market|american stock|silicon valley|tsm|tsmc|taiwan semi|taiwan stock|taiex|台積電|taiwan market|amd|nvidia|apple|microsoft|google|amazon|meta|tesla|openai|intel|qualcomm|broadcom|arm\b|asml|us economy|us gdp|us inflation|us jobs|us earnings|us trade|us tariff|us china|white house|congress|sec\b|dow|s&p 500|russell|etf|nasdaq 100/i.test(stockCheck);
+          if (!isUSorTW) continue;
+
           const cat = classifyArticle(a.title || '', a.description || '');
           articles.push({
             title: a.title || '',
