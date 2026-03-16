@@ -1321,6 +1321,110 @@ function updateCountdownUI() {
   if (bar) bar.style.width = pct + '%';
 }
 
+// ── Fear & Greed: colour helper ──
+function fgiRatingZH(score) {
+  if (score <= 24) return { label: '極度恐懼', color: '#ef4444' };
+  if (score <= 44) return { label: '恐懼',     color: '#f97316' };
+  if (score <= 54) return { label: '中性',     color: '#ca8a04' };
+  if (score <= 74) return { label: '貪婪',     color: '#16a34a' };
+  return                  { label: '極度貪婪', color: '#15803d' };
+}
+
+// ── CNN Fear & Greed (via CORS proxy) ──
+async function loadFearGreed() {
+  const CNN_URL = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
+  const PROXIES = [
+    'https://corsproxy.io/?url=' + encodeURIComponent(CNN_URL),
+    'https://api.allorigins.win/get?url=' + encodeURIComponent(CNN_URL),
+    'https://thingproxy.freeboard.io/fetch/' + CNN_URL,
+  ];
+  try {
+    let data = null;
+    for (const proxy of PROXIES) {
+      try {
+        const res = await fetch(proxy);
+        const raw = await res.text();
+        const parsed = JSON.parse(raw);
+        data = parsed.contents ? JSON.parse(parsed.contents) : parsed;
+        if (data?.fear_and_greed) break;
+      } catch(pe) { console.warn('Proxy failed:', pe.message); continue; }
+    }
+    if (!data?.fear_and_greed) throw new Error('all proxies failed');
+
+    const now = data.fear_and_greed;
+    const score = Math.round(now.score);
+    const { label, color } = fgiRatingZH(score);
+
+    document.getElementById('fgiScore').textContent = score;
+    document.getElementById('fgiScore').style.color = color;
+    document.getElementById('fgiLabel').textContent = label;
+    document.getElementById('fgiLabel').style.color = color;
+
+    const arcLen = 251;
+    const filled = (score / 100) * arcLen;
+    document.getElementById('fgiArc').setAttribute('stroke-dasharray', `${filled} ${arcLen - filled}`);
+    document.getElementById('fgiArc').setAttribute('stroke', color);
+    document.getElementById('fgiNeedle').setAttribute('transform', `rotate(${-90 + (score/100)*180}, 100, 100)`);
+
+    const ts = now.timestamp ? new Date(now.timestamp * 1000).toLocaleString('zh-TW', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    document.getElementById('fgiTs').textContent = '資料來源：CNN · ' + ts;
+    document.getElementById('fgiLoading').style.display = 'none';
+    document.getElementById('fgiContent').style.display = 'block';
+  } catch(e) {
+    console.warn('CNN FGI failed, trying Alternative.me:', e.message);
+    try {
+      const r2 = await fetch('https://api.alternative.me/fng/?limit=1');
+      const d2 = await r2.json();
+      const score = parseInt(d2.data?.[0]?.value || 0);
+      const { label, color } = fgiRatingZH(score);
+      document.getElementById('fgiScore').textContent = score;
+      document.getElementById('fgiScore').style.color = color;
+      document.getElementById('fgiLabel').textContent = label + ' (加密市場)';
+      document.getElementById('fgiLabel').style.color = color;
+      const arcLen = 251;
+      document.getElementById('fgiArc').setAttribute('stroke-dasharray', `${(score/100)*arcLen} ${arcLen-(score/100)*arcLen}`);
+      document.getElementById('fgiArc').setAttribute('stroke', color);
+      document.getElementById('fgiNeedle').setAttribute('transform', `rotate(${-90+(score/100)*180}, 100, 100)`);
+      document.getElementById('fgiTs').textContent = '資料來源：Alternative.me（加密市場版）';
+      document.getElementById('fgiLoading').style.display = 'none';
+      document.getElementById('fgiContent').style.display = 'block';
+    } catch(e2) {
+      document.getElementById('fgiLoading').textContent = '載入失敗';
+    }
+  }
+}
+
+// ── Crypto Fear & Greed (Alternative.me) ──
+async function loadCryptoFearGreed() {
+  try {
+    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json');
+    const data = await res.json();
+    const hist = data.data || [];
+    if (!hist.length) throw new Error('no data');
+
+    const score = parseInt(hist[0].value);
+    const { label, color } = fgiRatingZH(score);
+
+    document.getElementById('fgiCryptoScore').textContent = score;
+    document.getElementById('fgiCryptoScore').style.color = color;
+    document.getElementById('fgiCryptoLabel').textContent = label;
+    document.getElementById('fgiCryptoLabel').style.color = color;
+
+    const arcLen = 251;
+    const filled = (score / 100) * arcLen;
+    document.getElementById('fgiCryptoArc').setAttribute('stroke-dasharray', `${filled} ${arcLen - filled}`);
+    document.getElementById('fgiCryptoArc').setAttribute('stroke', color);
+    document.getElementById('fgiCryptoNeedle').setAttribute('transform', `rotate(${-90 + (score/100)*180}, 100, 100)`);
+
+    document.getElementById('fgiCryptoTs').textContent = '資料來源：Alternative.me · ' + new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('fgiCryptoLoading').style.display = 'none';
+    document.getElementById('fgiCryptoContent').style.display = 'block';
+  } catch(e) {
+    document.getElementById('fgiCryptoLoading').textContent = '載入失敗';
+    console.warn('Crypto FGI error:', e.message);
+  }
+}
+
 // ── localStorage: remember keys ──
 function saveGroqKey() {
   const key = document.getElementById('groqKey').value.trim();
