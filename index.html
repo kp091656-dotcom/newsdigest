@@ -954,10 +954,10 @@ async function fetchMarketaux() {
 
   try {
     // Fetch all+top pages concurrently via Vercel proxy
-    const reqs = [
-      ...[ 1,2,3 ].map(p => fetch(`https://newsdigest-api.vercel.app/api/news?type=all&page=${p}`).then(r=>r.json()).catch(()=>null)),
-      ...[ 1,2 ].map(p => fetch(`https://newsdigest-api.vercel.app/api/news?type=top&page=${p}`).then(r=>r.json()).catch(()=>null)),
-    ];
+    // Fetch 10 pages × 3 articles = up to 30 articles from Bloomberg/Reuters/CNBC/WSJ/FT
+    const reqs = [1,2,3,4,5,6,7,8,9,10].map(p =>
+      fetch(`https://newsdigest-api.vercel.app/api/news?page=${p}`).then(r=>r.json()).catch(()=>null)
+    );
     const results = await Promise.all(reqs);
 
     let articles = [];
