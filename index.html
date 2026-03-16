@@ -601,11 +601,11 @@
 <!-- API Config -->
 <div class="api-config-bar">
   <div class="api-row">
-    <label>◆ MARKETAUX KEY</label>
-    <input class="api-input" id="marketauxKey" type="password" placeholder="Marketaux API Key（marketaux.com 免費申請，不需信用卡）">
+    <label>◆ 新聞來源</label>
+    <input class="api-input" id="marketauxKey" type="password" placeholder="Bloomberg · Reuters · CNBC · WSJ · FT（自動載入）" readonly style="opacity:0.5;cursor:default;">
     <button class="api-fetch-btn" id="fetchBtn" onclick="fetchMarketaux()">載入財經新聞</button>
     <span class="api-status" id="apiStatus">示範模式</span>
-    <span class="api-hint">免費申請：<a href="https://www.marketaux.com/register" target="_blank">marketaux.com</a> · 每日 100 次</span>
+    <span class="api-hint">透過 Vercel 伺服器自動轉接 · 每日 200 次</span>
   </div>
   <div class="api-row">
     <label>◆ GROQ KEY</label>
@@ -944,26 +944,21 @@ function setStatus(msg, type) {
   el.className = 'api-status' + (type ? ' ' + type : '');
 }
 
-// ── News fetch: Marketaux (17 pages × 3 = 51 articles) ──
+// ── News fetch: TheNewsAPI via Vercel proxy ──
 async function fetchMarketaux() {
-  const key = document.getElementById('marketauxKey').value.trim();
-  if (!key) { setStatus('請輸入 Marketaux API Key', 'err'); return; }
-
   const btn = document.getElementById('fetchBtn');
   btn.disabled = true;
   btn.textContent = '載入中…';
-  setStatus('連線 Marketaux…', 'loading');
-  document.getElementById('newsFeed').innerHTML = '<div class="feed-state"><div class="spinner"></div><p>正在從 Marketaux 載入財經新聞…</p></div>';
-
-  const published_after = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
+  setStatus('連線中…', 'loading');
+  document.getElementById('newsFeed').innerHTML = '<div class="feed-state"><div class="spinner"></div><p>正在從 Bloomberg · Reuters · CNBC · WSJ · FT 載入新聞…</p></div>';
 
   try {
-    const pages = Array.from({length: 17}, (_, i) => i + 1);
-    const requests = pages.map(p =>
-      fetch(`https://api.marketaux.com/v1/news/all?language=en&limit=3&page=${p}&sort_by=entity_popularity_score&published_after=${published_after}&api_token=${key}`)
-        .then(r => r.json()).catch(() => null)
-    );
-    const results = await Promise.all(requests);
+    // Fetch all+top pages concurrently via Vercel proxy
+    const reqs = [
+      ...[ 1,2,3 ].map(p => fetch(`https://newsdigest-api.vercel.app/api/news?type=all&page=${p}`).then(r=>r.json()).catch(()=>null)),
+      ...[ 1,2 ].map(p => fetch(`https://newsdigest-api.vercel.app/api/news?type=top&page=${p}`).then(r=>r.json()).catch(()=>null)),
+    ];
+    const results = await Promise.all(reqs);
 
     let articles = [];
     for (const data of results) {
@@ -977,10 +972,9 @@ async function fetchMarketaux() {
 
         // Must relate to US or TW stocks
         const stockCheck = (a.title||'') + ' ' + (a.description||'');
-        const isUSorTW = /nasdaq|s&p|dow jones|nyse|wall street|federal reserve|fed|us stock|us market|silicon valley|tsm|tsmc|taiwan semi|taiwan stock|taiex|台積電|amd|nvidia|apple|microsoft|google|amazon|meta|tesla|openai|intel|qualcomm|broadcom|arm|asml|us economy|us gdp|us inflation|us jobs|us earnings|us trade|us tariff|us china|white house|congress|sec|dow|s&p 500|russell|etf|nasdaq 100/i.test(stockCheck);
+        const isUSorTW = /nasdaq|s&p|dow jones|nyse|wall street|federal reserve|\bfed\b|us stock|us market|silicon valley|tsm|tsmc|taiwan semi|taiwan stock|taiex|台積電|amd|nvidia|apple|microsoft|google|amazon|meta|tesla|openai|intel|qualcomm|broadcom|\barm\b|asml|us economy|us gdp|us inflation|us jobs|us earnings|us trade|us tariff|us china|white house|congress|\bsec\b|\bdow\b|s&p 500|russell|\betf\b|nasdaq 100/i.test(stockCheck);
         if (!isUSorTW) continue;
 
-        const entityScore = a.entities?.reduce((max, e) => Math.max(max, e.popularity_score || 0), 0) || 0;
         articles.push({
           title: a.title || '',
           description: (a.description || '').slice(0, 300),
@@ -988,7 +982,7 @@ async function fetchMarketaux() {
           publishedAt: a.published_at || new Date().toISOString(),
           source: a.source || '',
           category: classifyArticle(a.title || '', a.description || ''),
-          popularityScore: entityScore,
+          popularityScore: 0,
         });
       }
     }
@@ -997,20 +991,14 @@ async function fetchMarketaux() {
     const seen = new Set();
     articles = articles.filter(a => { if (!a.title || seen.has(a.title)) return false; seen.add(a.title); return true; });
 
-    // Rank-based score if all zero
-    const allZero = articles.every(a => a.popularityScore === 0);
-    if (allZero) {
-      console.log('Using rank-based popularity scores');
-      articles.forEach((a, i) => { a.popularityScore = Math.round(100 - (i / Math.max(articles.length - 1, 1)) * 90); });
-    }
-
-    articles.sort((a, b) => b.popularityScore - a.popularityScore);
+    // Sort by time, rank-based score
+    articles.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
     articles = articles.slice(0, 50);
+    articles.forEach((a, i) => { a.popularityScore = Math.round(100 - (i / Math.max(articles.length-1,1)) * 90); });
 
-    if (!articles.length) throw new Error('未取得任何新聞，請確認 API Key 正確');
+    if (!articles.length) throw new Error('未取得任何新聞，請稍後再試');
 
     allArticles = articles;
-    localStorage.setItem('nd_marketaux_key', key);
 
     const techCnt = articles.filter(a => a.category === 'tech').length;
     const econCnt = articles.filter(a => a.category === 'economy').length;
@@ -1352,7 +1340,6 @@ function loadSavedKeys() {
   const gemk = localStorage.getItem('nd_groq_key');
   const mxk = localStorage.getItem('nd_marketaux_key');
   if (gemk) { groqApiKey = gemk; document.getElementById('groqKey').value = gemk; setGroqStatus('✓ 已啟用（已記住）', 'ok'); }
-  if (mxk) { document.getElementById('marketauxKey').value = mxk; }
 }
 
 // ── Init ──
