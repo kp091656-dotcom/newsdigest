@@ -905,6 +905,14 @@ function createCard(article, idx) {
 }
 
 // ── Render feed ──
+function classifyArticle(title, description) {
+  const t = (title + ' ' + description).toLowerCase();
+  if (/war|sanction|tariff|trade war|geopolit|nato|military|russia|ukraine|taiwan strait|conflict|diplomatic|election|congress|white house|xi jinping|government|policy|regulation|antitrust|legislation|iran|north korea/.test(t)) return 'geopolitics';
+  if (/\bai\b|artificial intelligence|chatgpt|openai|nvidia|semiconductor|chip|llm|machine learning|apple|microsoft|google|alphabet|meta|amazon|tesla|software|hardware|cloud|cyber|quantum|robot|autonomous|electric vehicle|\bev\b|5g|biotech|tsmc|taiwan semi/.test(t)) return 'tech';
+  if (/fed|federal reserve|interest rate|inflation|gdp|recession|economy|treasury|earnings|revenue|profit|stock|market|nasdaq|s&p|dow|bond|yield|currency|dollar|euro|yen|oil|gold|crypto|bitcoin|etf|fund|invest|bank|finance|quarter|fiscal/.test(t)) return 'economy';
+  return 'general';
+}
+
 function renderFeed(articles) {
   const feed = document.getElementById('newsFeed');
   if (!articles.length) {
@@ -1332,24 +1340,10 @@ function fgiRatingZH(score) {
 
 // ── CNN Fear & Greed (via CORS proxy) ──
 async function loadFearGreed() {
-  const CNN_URL = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
-  const PROXIES = [
-    'https://corsproxy.io/?url=' + encodeURIComponent(CNN_URL),
-    'https://api.allorigins.win/get?url=' + encodeURIComponent(CNN_URL),
-    'https://thingproxy.freeboard.io/fetch/' + CNN_URL,
-  ];
   try {
-    let data = null;
-    for (const proxy of PROXIES) {
-      try {
-        const res = await fetch(proxy);
-        const raw = await res.text();
-        const parsed = JSON.parse(raw);
-        data = parsed.contents ? JSON.parse(parsed.contents) : parsed;
-        if (data?.fear_and_greed) break;
-      } catch(pe) { console.warn('Proxy failed:', pe.message); continue; }
-    }
-    if (!data?.fear_and_greed) throw new Error('all proxies failed');
+    const res = await fetch('https://newsdigest-api.vercel.app/api/news?endpoint=fgi');
+    const data = await res.json();
+    if (!data?.fear_and_greed) throw new Error('no data');
 
     const now = data.fear_and_greed;
     const score = Math.round(now.score);
